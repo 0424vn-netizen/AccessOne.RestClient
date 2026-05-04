@@ -1,6 +1,6 @@
 using System;
+using VW.Api.RestClient;
 using VW.PCI.Api.Client.Sample.Examples;
-using VW.PCI.Api.Client.Sample.Infrastructure;
 
 namespace VW.PCI.Api.Client.Sample
 {
@@ -11,13 +11,13 @@ namespace VW.PCI.Api.Client.Sample
             Console.WriteLine("=== VW.PCI.Api.Client — Sample Usage ===\n");
 
             // ------------------------------------------------------------------
-            // BƯỚC 1: Setup 1 lần khi app start
-            // Trong ASP.NET: gọi ở Application_Start (Global.asax) hoặc Startup.cs
+            // Setup đường dẫn config 1 lần khi app start
+            // Trong ASP.NET: đặt ở Application_Start (Global.asax) hoặc Startup.cs
             // ------------------------------------------------------------------
-            PCIClientFactory.Initialize();
+            ApiSettingsManager.Setup(settingFilesDirectory: @"App_Data\ApiSettings");
 
             // ------------------------------------------------------------------
-            // BƯỚC 2: Dùng PCIServiceClient.Instance ở bất kỳ đâu — không cần new, không cần inject
+            // Dùng PCIClient.Instance trực tiếp — không cần new, không cần factory
             // ------------------------------------------------------------------
             var examples = new UserExamples();
 
@@ -34,7 +34,7 @@ namespace VW.PCI.Api.Client.Sample
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"\n[FATAL] Unhandled exception: {ex.Message}");
+                Console.WriteLine($"\n[FATAL] {ex.Message}");
             }
 
             Console.WriteLine("\n=== Done. Press any key to exit. ===");

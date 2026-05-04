@@ -6,16 +6,12 @@ namespace VW.PCI.Api.Client.Sample.Examples
 {
     public class UserExamples
     {
-        // Không cần inject, không cần new — dùng thẳng Instance
-        private static IPCIServiceClient Client => PCIServiceClient.Instance;
+        // Dùng thẳng PCIClient.Instance — giống StatementClient.Instance.Method(...)
+        private static IPCIServiceClient Client => PCIClient.Instance;
 
-        // =====================================================================
-        // 1. CreateUser
-        // =====================================================================
         public void CreateUser()
         {
             Console.WriteLine("\n=== CreateUser ===");
-
             var result = Client.CreateUser(new CreateUserRequest
             {
                 UserName            = "john.doe",
@@ -36,17 +32,12 @@ namespace VW.PCI.Api.Client.Sample.Examples
                 EntityID            = "E001",
                 EntityTypeID        = "ET001"
             });
-
             PrintResult(result);
         }
 
-        // =====================================================================
-        // 2. UpdateUser
-        // =====================================================================
         public void UpdateUser()
         {
             Console.WriteLine("\n=== UpdateUser ===");
-
             var result = Client.UpdateUser(new UpdateUserRequest
             {
                 RecId               = "550e8400-e29b-41d4-a716-446655440000",
@@ -63,23 +54,17 @@ namespace VW.PCI.Api.Client.Sample.Examples
                 HierarchyIds        = "H001,H002,H003",
                 PciAccess           = true
             });
-
             PrintResult(result);
         }
 
-        // =====================================================================
-        // 3. GetMasterMerchant
-        // =====================================================================
         public void GetMasterMerchant()
         {
             Console.WriteLine("\n=== GetMasterMerchant ===");
-
             var result = Client.GetMasterMerchant(new GetMasterMerchantRequest
             {
                 ASClient      = "64",
                 PrimaryUserId = "john.doe"
             });
-
             if (result.IsSuccess)
             {
                 Console.WriteLine($"  MerchantNumber : {result.Data.MerchantNumber}");
@@ -88,13 +73,9 @@ namespace VW.PCI.Api.Client.Sample.Examples
             else PrintError(result);
         }
 
-        // =====================================================================
-        // 4. GetHierarchyID
-        // =====================================================================
         public void GetHierarchyID()
         {
             Console.WriteLine("\n=== GetHierarchyID ===");
-
             var result = Client.GetHierarchyID(new GetHierarchyIDRequest
             {
                 ASClient        = "64",
@@ -103,20 +84,15 @@ namespace VW.PCI.Api.Client.Sample.Examples
                 ActiveStatus    = "1",
                 SystemId        = ""
             });
-
             if (result.IsSuccess && result.Data?.Data != null)
                 foreach (var item in result.Data.Data)
                     Console.WriteLine($"  {item.HierarchyID} — {item.HierarchyName} ({item.HierarchyCode})");
             else PrintError(result);
         }
 
-        // =====================================================================
-        // 5. UpdSecRoleByUserID
-        // =====================================================================
         public void UpdSecRoleByUserID()
         {
             Console.WriteLine("\n=== UpdSecRoleByUserID ===");
-
             var result = Client.UpdSecRoleByUserID(new UpdSecRoleByUserIDRequest
             {
                 ASClient          = "64",
@@ -124,40 +100,29 @@ namespace VW.PCI.Api.Client.Sample.Examples
                 RoleID            = "ROLE_ADMIN",
                 HierarchyEntityID = "H001"
             });
-
             PrintResult(result);
         }
 
-        // =====================================================================
-        // 6. UpdateOptInOut
-        // =====================================================================
         public void UpdateOptInOut()
         {
             Console.WriteLine("\n=== UpdateOptInOut ===");
-
             var result = Client.UpdateOptInOut(new UpdateOptInOutRequest
             {
                 ASClient = "64",
                 UserID   = "john.doe",
                 IsActive = false
             });
-
             PrintResult(result);
         }
 
-        // =====================================================================
-        // 7. GetAllHierarchyForAO
-        // =====================================================================
         public void GetAllHierarchyForAO()
         {
             Console.WriteLine("\n=== GetAllHierarchyForAO ===");
-
             var result = Client.GetAllHierarchyForAO(new GetAllHierarchyForAORequest
             {
                 ASClient    = "64",
                 UserSecRole = "MERCHANT"
             });
-
             if (result.IsSuccess && result.Data?.Data != null)
             {
                 Console.WriteLine($"  Total: {result.Data.Data.Count}");
@@ -167,19 +132,14 @@ namespace VW.PCI.Api.Client.Sample.Examples
             else PrintError(result);
         }
 
-        // =====================================================================
-        // 8. GetUsers
-        // =====================================================================
         public void GetUsers()
         {
             Console.WriteLine("\n=== GetUsers ===");
-
             var result = Client.GetUsers(new GetUsersRequest
             {
                 ASClient = "64",
                 UserName = "john.doe"
             });
-
             if (result.IsSuccess && result.Data?.Data != null)
                 foreach (var user in result.Data.Data)
                 {
@@ -194,9 +154,6 @@ namespace VW.PCI.Api.Client.Sample.Examples
             else PrintError(result);
         }
 
-        // =====================================================================
-        // Helpers
-        // =====================================================================
         private static void PrintResult<T>(PCIApiResponse<T> result)
         {
             if (result.IsSuccess)
@@ -205,9 +162,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
                 PrintError(result);
         }
 
-        private static void PrintError<T>(PCIApiResponse<T> result)
-        {
+        private static void PrintError<T>(PCIApiResponse<T> result) =>
             Console.WriteLine($"  FAILED — Status: {result.StatusCode} | Error: {result.ErrorMessage}");
-        }
     }
 }

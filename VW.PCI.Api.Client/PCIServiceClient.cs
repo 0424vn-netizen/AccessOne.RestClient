@@ -9,43 +9,32 @@ using VW.PCI.Api.Client.Models.Responses;
 
 namespace VW.PCI.Api.Client
 {
-    public class PCIServiceClient : VWRestClient, IPCIServiceClient
+    /// <summary>
+    /// Abstract base client cho PCI APIs.
+    /// Kế thừa class này trong consumer project, cung cấp logger/loggingService/tokenProvider
+    /// của project đó, và đặt Singleton Instance tại đó.
+    ///
+    /// Ví dụ trong consumer project:
+    ///   public class PCIClient : PCIServiceClient
+    ///   {
+    ///       private static readonly Lazy<PCIClient> _lazy = new Lazy<PCIClient>(() => new PCIClient());
+    ///       public static PCIClient Instance => _lazy.Value;
+    ///
+    ///       private PCIClient()
+    ///           : base(MyLogger.Instance, MyLoggingService.Instance, new MyPCITokenProvider(...)) { }
+    ///   }
+    ///
+    ///   // Dùng:
+    ///   PCIClient.Instance.GetUsers(request);
+    /// </summary>
+    public abstract class PCIServiceClient : VWRestClient, IPCIServiceClient
     {
-        private const string ApiSource = "pci";
+        private const string ApiSource      = "pci";
         private const string ApiSettingFile = "pciSettings.xml";
 
         private readonly PCITokenProvider _tokenProvider;
 
-        // ---------------------------------------------------------------------
-        // Singleton
-        // ---------------------------------------------------------------------
-
-        private static Lazy<PCIServiceClient> _lazyInstance;
-
-        /// <summary>
-        /// Truy cập singleton instance sau khi đã gọi Setup().
-        /// </summary>
-        public static PCIServiceClient Instance =>
-            _lazyInstance?.Value
-            ?? throw new InvalidOperationException(
-                "PCIServiceClient chưa được khởi tạo. Gọi PCIServiceClient.Setup() trước.");
-
-        /// <summary>
-        /// Cấu hình và khởi tạo singleton. Gọi 1 lần duy nhất khi app start.
-        /// Sau đó dùng PCIServiceClient.Instance ở bất kỳ đâu.
-        /// </summary>
-        public static void Setup(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
-        {
-            _lazyInstance = new Lazy<PCIServiceClient>(
-                () => new PCIServiceClient(logger, loggingService, tokenProvider)
-            );
-        }
-
-        // ---------------------------------------------------------------------
-        // Constructor (private — buộc dùng qua Setup/Instance)
-        // ---------------------------------------------------------------------
-
-        private PCIServiceClient(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
+        protected PCIServiceClient(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
             : base(logger, loggingService, ApiSource, ApiSettingFile, new RestClientSettings())
         {
             _tokenProvider = tokenProvider ?? throw new ArgumentNullException(nameof(tokenProvider));
@@ -109,8 +98,8 @@ namespace VW.PCI.Api.Client
             try
             {
                 var apiSetting = this.GetApiSetting(path);
-                var tid = trackingId ?? Guid.NewGuid().ToString("N");
-                var response = this.PostForRestResponse<TBody, TResult>(apiSetting, body, trackingId: tid);
+                var tid        = trackingId ?? Guid.NewGuid().ToString("N");
+                var response   = this.PostForRestResponse<TBody, TResult>(apiSetting, body, trackingId: tid);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                     return new PCIApiResponse<TResult>

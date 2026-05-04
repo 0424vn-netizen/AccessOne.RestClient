@@ -3,12 +3,15 @@ using VW.Api.RestClient;
 
 namespace VW.PCI.Api.Client.Sample.Infrastructure
 {
-    /// <summary>
-    /// Logger mẫu ghi ra Console.
-    /// Thực tế thay bằng NLog, Serilog, log4net, hoặc ILogger của framework bạn đang dùng.
-    /// </summary>
     public class SampleLogger : ILogger
     {
+        private static readonly Lazy<SampleLogger> _lazy =
+            new Lazy<SampleLogger>(() => new SampleLogger());
+
+        public static SampleLogger Instance => _lazy.Value;
+
+        private SampleLogger() { }
+
         public void Debug(string message) => Log("DEBUG", message);
         public void Info(string message)  => Log("INFO ", message);
         public void Warn(string message)  => Log("WARN ", message);

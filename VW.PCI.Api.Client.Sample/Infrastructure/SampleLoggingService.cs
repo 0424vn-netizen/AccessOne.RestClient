@@ -1,28 +1,24 @@
+using System;
 using VW.Api.RestClient;
 using VW.Api.RestClient.Models;
 
 namespace VW.PCI.Api.Client.Sample.Infrastructure
 {
-    /// <summary>
-    /// Logging service mẫu — ghi tracking info ra logger.
-    /// Thực tế có thể ghi vào DB, Elasticsearch, Azure AppInsights...
-    /// </summary>
     public class SampleLoggingService : ILoggingService
     {
-        private readonly ILogger _logger;
+        private static readonly Lazy<SampleLoggingService> _lazy =
+            new Lazy<SampleLoggingService>(() => new SampleLoggingService());
 
-        public SampleLoggingService(ILogger logger)
-        {
-            _logger = logger;
-        }
+        public static SampleLoggingService Instance => _lazy.Value;
+
+        private SampleLoggingService() { }
 
         public void Log(ApiTrackingInfo trackingInfo)
         {
             if (trackingInfo == null) return;
-            _logger.Debug($"[TRACKING] Id={trackingInfo.TrackingId} | " +
-                          $"URL={trackingInfo.Url} | " +
-                          $"Status={trackingInfo.ResponseStatusCode} | " +
-                          $"Duration={trackingInfo.Duration}ms");
+            SampleLogger.Instance.Debug(
+                $"[TRACKING] Id={trackingInfo.TrackingId} | URL={trackingInfo.Url} | " +
+                $"Status={trackingInfo.ResponseStatusCode} | Duration={trackingInfo.Duration}ms");
         }
     }
 }
