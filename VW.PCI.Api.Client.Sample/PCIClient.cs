@@ -1,15 +1,14 @@
 using System;
-using VW.Api.RestClient;
 using VW.PCI.Api.Client;
+using VW.PCI.Api.Client.Models.Common;
 using VW.PCI.Api.Client.Models.Requests;
 using VW.PCI.Api.Client.Sample.Infrastructure;
-using VW.PCI.Api.Client.Sample.Providers;
 
 namespace VW.PCI.Api.Client.Sample
 {
     /// <summary>
     /// Concrete PCI client của consumer project.
-    /// Kế thừa PCIServiceClient, wire dependencies của project này vào,
+    /// Kế thừa PCIServiceClient, implement token storage bằng static in-memory field,
     /// và expose Singleton Instance để dùng ở bất kỳ đâu.
     /// </summary>
     public class PCIClient : PCIServiceClient
@@ -23,16 +22,17 @@ namespace VW.PCI.Api.Client.Sample
             : base(
                 logger:         SampleLogger.Instance,
                 loggingService: SampleLoggingService.Instance,
-                tokenProvider:  new SamplePCITokenProvider(
-                    new AuthTokenRequest
-                    {
-                        ApplicationId   = "your-application-id",
-                        ApplicationName = "VisionWeb",
-                        ApplicationCode = "your-application-code"
-                    },
-                    SampleLogger.Instance
-                )
+                credentials:    new AuthTokenRequest
+                {
+                    ApplicationId   = "your-application-id",
+                    ApplicationName = "VisionWeb",
+                    ApplicationCode = "your-application-code"
+                }
             )
         { }
+
+        private static PCITokenInfo _cachedToken;
+        protected override PCITokenInfo GetTokenFromDB() => _cachedToken;
+        protected override void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
     }
 }

@@ -11,8 +11,8 @@ namespace VW.PCI.Api.Client
 {
     /// <summary>
     /// Abstract base client cho PCI APIs.
-    /// Kế thừa class này trong consumer project, cung cấp logger/loggingService/tokenProvider
-    /// của project đó, và đặt Singleton Instance tại đó.
+    /// Kế thừa class này trong consumer project, implement GetTokenFromDB() và SaveTokenToDB()
+    /// theo storage của project đó, và đặt Singleton Instance tại đó.
     ///
     /// Ví dụ trong consumer project:
     ///   public class PCIClient : PCIServiceClient
@@ -21,7 +21,11 @@ namespace VW.PCI.Api.Client
     ///       public static PCIClient Instance => _lazy.Value;
     ///
     ///       private PCIClient()
-    ///           : base(MyLogger.Instance, MyLoggingService.Instance, new MyPCITokenProvider(...)) { }
+    ///           : base(MyLogger.Instance, MyLoggingService.Instance, new AuthTokenRequest { ... }) { }
+    ///
+    ///       private static PCITokenInfo _cachedToken;
+    ///       protected override PCITokenInfo GetTokenFromDB() => _cachedToken;
+    ///       protected override void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
     ///   }
     ///
     ///   // Dùng:
@@ -32,13 +36,21 @@ namespace VW.PCI.Api.Client
         private const string ApiSource      = "pci";
         private const string ApiSettingFile = "pciSettings.xml";
 
-        private readonly PCITokenProvider _tokenProvider;
+        private readonly AuthTokenRequest _credentials;
+        private static readonly object _lock = new object();
 
-        protected PCIServiceClient(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
+        protected PCIServiceClient(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
             : base(logger, loggingService, ApiSource, ApiSettingFile, new RestClientSettings())
         {
-            _tokenProvider = tokenProvider ?? throw new ArgumentNullException(nameof(tokenProvider));
+            _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
         }
+
+        // ---------------------------------------------------------------------
+        // Token storage — consumer project implement theo DB framework của họ
+        // ---------------------------------------------------------------------
+
+        protected abstract PCITokenInfo GetTokenFromDB();
+        protected abstract void SaveTokenToDB(PCITokenInfo token);
 
         // ---------------------------------------------------------------------
         // Token injection
@@ -49,14 +61,41 @@ namespace VW.PCI.Api.Client
             if (apiSetting.Name == "auth/token")
                 return;
 
-            var token = _tokenProvider.GetAccessToken(FetchToken);
-            request.AddHeader("Authorization", $"Bearer {token}");
+            request.AddHeader("Authorization", $"Bearer {GetValidToken()}");
         }
 
-        private AuthTokenResponse FetchToken(AuthTokenRequest credentials)
+        private string GetValidToken()
         {
-            var apiSetting = this.GetApiSetting("auth/token");
-            return this.Post<AuthTokenRequest, AuthTokenResponse>(apiSetting, body: credentials);
+            var tokenInfo = GetTokenFromDB();
+            if (tokenInfo != null && tokenInfo.IsValid())
+                return tokenInfo.AccessToken;
+
+            lock (_lock)
+            {
+                tokenInfo = GetTokenFromDB();
+                if (tokenInfo != null && tokenInfo.IsValid())
+                    return tokenInfo.AccessToken;
+
+                Logger.Debug("PCIServiceClient: Token expired or not found. Fetching new token...");
+
+                var apiSetting = this.GetApiSetting("auth/token");
+                var response   = this.Post<AuthTokenRequest, AuthTokenResponse>(apiSetting, body: _credentials);
+
+                if (response == null || string.IsNullOrWhiteSpace(response.AccessToken))
+                    throw new InvalidOperationException("PCIServiceClient: Failed to retrieve access token from PCI API.");
+
+                var newToken = new PCITokenInfo
+                {
+                    AccessToken = response.AccessToken,
+                    TokenType   = response.TokenType,
+                    ExpireAt    = DateTime.UtcNow.AddMinutes(response.ExpireMinutes - 1)
+                };
+
+                SaveTokenToDB(newToken);
+                Logger.Debug($"PCIServiceClient: New token saved. Expires at {newToken.ExpireAt:O} UTC.");
+
+                return newToken.AccessToken;
+            }
         }
 
         // ---------------------------------------------------------------------
