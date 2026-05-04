@@ -39,7 +39,7 @@ namespace VW.PCI.Api.Client
                 return;
 
             var token = _tokenProvider.GetAccessToken(FetchToken);
-            request.AddOrUpdateHeader("Authorization", $"Bearer {token}");
+            request.AddOrUpdateParameter("Authorization", $"Bearer {token}", ParameterType.HttpHeader);
         }
 
         /// <summary>
