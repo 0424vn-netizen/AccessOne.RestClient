@@ -4,14 +4,6 @@ using VW.PCI.Api.Client.Sample.Infrastructure;
 
 namespace VW.PCI.Api.Client.Sample
 {
-    /// <summary>
-    /// Entry point — minh họa toàn bộ flow sử dụng VW.PCI.Api.Client.
-    ///
-    /// Cấu trúc project thực tế (ASP.NET, WinForms, Console...):
-    ///   1. Đăng ký IPCIServiceClient vào DI container (singleton)
-    ///   2. Inject IPCIServiceClient vào Service/Controller cần dùng
-    ///   3. Gọi method tương ứng
-    /// </summary>
     class Program
     {
         static void Main(string[] args)
@@ -19,24 +11,18 @@ namespace VW.PCI.Api.Client.Sample
             Console.WriteLine("=== VW.PCI.Api.Client — Sample Usage ===\n");
 
             // ------------------------------------------------------------------
-            // BƯỚC 1: Khởi tạo client (làm 1 lần duy nhất, giữ singleton)
+            // BƯỚC 1: Setup 1 lần khi app start
+            // Trong ASP.NET: gọi ở Application_Start (Global.asax) hoặc Startup.cs
             // ------------------------------------------------------------------
-            // Trong ASP.NET: đăng ký vào DI ở Startup.cs / Global.asax
-            //   container.RegisterInstance<IPCIServiceClient>(PCIClientFactory.Create());
-            //
-            // Trong Console / WinForms: tạo thủ công như dưới
-            var pciClient = PCIClientFactory.Create();
+            PCIClientFactory.Initialize();
 
             // ------------------------------------------------------------------
-            // BƯỚC 2: Chạy các ví dụ
+            // BƯỚC 2: Dùng PCIServiceClient.Instance ở bất kỳ đâu — không cần new, không cần inject
             // ------------------------------------------------------------------
-            var examples = new UserExamples(pciClient);
+            var examples = new UserExamples();
 
             try
             {
-                // Token được fetch tự động ở lần gọi đầu tiên,
-                // các lần sau dùng lại từ DB/cache cho đến khi hết hạn.
-
                 examples.GetUsers();
                 examples.CreateUser();
                 examples.UpdateUser();

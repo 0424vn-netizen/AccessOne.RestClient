@@ -1,6 +1,6 @@
 using RestSharp;
 using System;
-using System.Collections.Generic;
+using System.Net;
 using VW.Api.RestClient;
 using VW.Api.RestClient.Models;
 using VW.PCI.Api.Client.Models.Common;
@@ -9,10 +9,6 @@ using VW.PCI.Api.Client.Models.Responses;
 
 namespace VW.PCI.Api.Client
 {
-    /// <summary>
-    /// Client tích hợp toàn bộ PCI APIs.
-    /// Kế thừa VWRestClient — tự động xử lý token, logging, error handling.
-    /// </summary>
     public class PCIServiceClient : VWRestClient, IPCIServiceClient
     {
         private const string ApiSource = "pci";
@@ -20,20 +16,47 @@ namespace VW.PCI.Api.Client
 
         private readonly PCITokenProvider _tokenProvider;
 
-        public PCIServiceClient(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
+        // ---------------------------------------------------------------------
+        // Singleton
+        // ---------------------------------------------------------------------
+
+        private static Lazy<PCIServiceClient> _lazyInstance;
+
+        /// <summary>
+        /// Truy cập singleton instance sau khi đã gọi Setup().
+        /// </summary>
+        public static PCIServiceClient Instance =>
+            _lazyInstance?.Value
+            ?? throw new InvalidOperationException(
+                "PCIServiceClient chưa được khởi tạo. Gọi PCIServiceClient.Setup() trước.");
+
+        /// <summary>
+        /// Cấu hình và khởi tạo singleton. Gọi 1 lần duy nhất khi app start.
+        /// Sau đó dùng PCIServiceClient.Instance ở bất kỳ đâu.
+        /// </summary>
+        public static void Setup(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
+        {
+            _lazyInstance = new Lazy<PCIServiceClient>(
+                () => new PCIServiceClient(logger, loggingService, tokenProvider)
+            );
+        }
+
+        // ---------------------------------------------------------------------
+        // Constructor (private — buộc dùng qua Setup/Instance)
+        // ---------------------------------------------------------------------
+
+        private PCIServiceClient(ILogger logger, ILoggingService loggingService, PCITokenProvider tokenProvider)
             : base(logger, loggingService, ApiSource, ApiSettingFile, new RestClientSettings())
         {
             _tokenProvider = tokenProvider ?? throw new ArgumentNullException(nameof(tokenProvider));
         }
 
-        #region Token injection
+        // ---------------------------------------------------------------------
+        // Token injection
+        // ---------------------------------------------------------------------
 
-        /// <summary>
-        /// Tự động gắn Bearer token vào mọi request trước khi gửi.
-        /// </summary>
         protected override void InterceptRequest(string trackingId, ApiSetting apiSetting, IRestRequest request)
         {
-            // Auth endpoint không cần token
             if (apiSetting.Name == "auth/token")
                 return;
 
@@ -41,62 +64,43 @@ namespace VW.PCI.Api.Client
             request.AddHeader("Authorization", $"Bearer {token}");
         }
 
-        /// <summary>
-        /// Hàm gọi API lấy token — được truyền vào PCITokenProvider.
-        /// </summary>
         private AuthTokenResponse FetchToken(AuthTokenRequest credentials)
         {
             var apiSetting = this.GetApiSetting("auth/token");
             return this.Post<AuthTokenRequest, AuthTokenResponse>(apiSetting, body: credentials);
         }
 
-        #endregion
-
-        #region API Methods
+        // ---------------------------------------------------------------------
+        // API Methods
+        // ---------------------------------------------------------------------
 
         public PCIApiResponse<CreateUserResponse> CreateUser(CreateUserRequest request)
-        {
-            return Execute<CreateUserRequest, CreateUserResponse>("user/CreateUser", request);
-        }
+            => Execute<CreateUserRequest, CreateUserResponse>("user/CreateUser", request);
 
         public PCIApiResponse<UpdateUserResponse> UpdateUser(UpdateUserRequest request)
-        {
-            return Execute<UpdateUserRequest, UpdateUserResponse>("user/UpdateUser", request);
-        }
+            => Execute<UpdateUserRequest, UpdateUserResponse>("user/UpdateUser", request);
 
         public PCIApiResponse<GetMasterMerchantResponse> GetMasterMerchant(GetMasterMerchantRequest request)
-        {
-            return Execute<GetMasterMerchantRequest, GetMasterMerchantResponse>("user/GetMasterMerchant", request);
-        }
+            => Execute<GetMasterMerchantRequest, GetMasterMerchantResponse>("user/GetMasterMerchant", request);
 
         public PCIApiResponse<GetHierarchyIDResponse> GetHierarchyID(GetHierarchyIDRequest request)
-        {
-            return Execute<GetHierarchyIDRequest, GetHierarchyIDResponse>("user/GetHierarchyID", request);
-        }
+            => Execute<GetHierarchyIDRequest, GetHierarchyIDResponse>("user/GetHierarchyID", request);
 
         public PCIApiResponse<UpdSecRoleByUserIDResponse> UpdSecRoleByUserID(UpdSecRoleByUserIDRequest request)
-        {
-            return Execute<UpdSecRoleByUserIDRequest, UpdSecRoleByUserIDResponse>("user/UpdSecRoleByUserID", request);
-        }
+            => Execute<UpdSecRoleByUserIDRequest, UpdSecRoleByUserIDResponse>("user/UpdSecRoleByUserID", request);
 
         public PCIApiResponse<UpdateOptInOutResponse> UpdateOptInOut(UpdateOptInOutRequest request)
-        {
-            return Execute<UpdateOptInOutRequest, UpdateOptInOutResponse>("user/UpdateOptInOut", request);
-        }
+            => Execute<UpdateOptInOutRequest, UpdateOptInOutResponse>("user/UpdateOptInOut", request);
 
         public PCIApiResponse<GetAllHierarchyForAOResponse> GetAllHierarchyForAO(GetAllHierarchyForAORequest request)
-        {
-            return Execute<GetAllHierarchyForAORequest, GetAllHierarchyForAOResponse>("user/GetAllHierarchyForAO", request);
-        }
+            => Execute<GetAllHierarchyForAORequest, GetAllHierarchyForAOResponse>("user/GetAllHierarchyForAO", request);
 
         public PCIApiResponse<GetUsersResponse> GetUsers(GetUsersRequest request)
-        {
-            return Execute<GetUsersRequest, GetUsersResponse>("user/GetUsers", request);
-        }
+            => Execute<GetUsersRequest, GetUsersResponse>("user/GetUsers", request);
 
-        #endregion
-
-        #region Private helpers
+        // ---------------------------------------------------------------------
+        // Private helpers
+        // ---------------------------------------------------------------------
 
         private PCIApiResponse<TResult> Execute<TBody, TResult>(string path, TBody body, string trackingId = null)
             where TBody : class, new()
@@ -109,22 +113,20 @@ namespace VW.PCI.Api.Client
                 var response = this.PostForRestResponse<TBody, TResult>(apiSetting, body, trackingId: tid);
 
                 if (response.StatusCode == HttpStatusCode.OK)
-                {
                     return new PCIApiResponse<TResult>
                     {
-                        IsSuccess = true,
+                        IsSuccess  = true,
                         StatusCode = response.StatusCode,
                         TrackingId = tid,
-                        Data = response.Data
+                        Data       = response.Data
                     };
-                }
 
                 var error = TryDeserializeError(response.Content);
                 return new PCIApiResponse<TResult>
                 {
-                    IsSuccess = false,
-                    StatusCode = response.StatusCode,
-                    TrackingId = error?.TrackId ?? tid,
+                    IsSuccess    = false,
+                    StatusCode   = response.StatusCode,
+                    TrackingId   = error?.TrackId ?? tid,
                     ErrorMessage = error?.ErrorMessage ?? response.StatusDescription
                 };
             }
@@ -133,9 +135,9 @@ namespace VW.PCI.Api.Client
                 Logger.Error(ex);
                 return new PCIApiResponse<TResult>
                 {
-                    IsSuccess = false,
-                    StatusCode = ex.StatusCode,
-                    TrackingId = ex.TrackingId,
+                    IsSuccess    = false,
+                    StatusCode   = ex.StatusCode,
+                    TrackingId   = ex.TrackingId,
                     ErrorMessage = ex.Message
                 };
             }
@@ -144,8 +146,8 @@ namespace VW.PCI.Api.Client
                 Logger.Error(ex);
                 return new PCIApiResponse<TResult>
                 {
-                    IsSuccess = false,
-                    StatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess    = false,
+                    StatusCode   = HttpStatusCode.InternalServerError,
                     ErrorMessage = ex.Message
                 };
             }
@@ -153,16 +155,8 @@ namespace VW.PCI.Api.Client
 
         private PCIErrorResponse TryDeserializeError(string content)
         {
-            try
-            {
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<PCIErrorResponse>(content);
-            }
-            catch
-            {
-                return null;
-            }
+            try { return Newtonsoft.Json.JsonConvert.DeserializeObject<PCIErrorResponse>(content); }
+            catch { return null; }
         }
-
-        #endregion
     }
 }
