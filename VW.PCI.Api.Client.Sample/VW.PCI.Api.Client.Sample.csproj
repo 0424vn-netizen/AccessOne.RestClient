@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <AssemblyName>VW.PCI.Api.Client.Sample</AssemblyName>
+    <RootNamespace>VW.PCI.Api.Client.Sample</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference tới PCI client library -->
+    <ProjectReference Include="..\VW.PCI.Api.Client\VW.PCI.Api.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+</Project>
