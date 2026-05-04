@@ -1,83 +1,109 @@
 using System;
 using VW.Api.RestClient.Models;
+using VW.PCI.Api.Client.Models.Common;
 using VW.PCI.Api.Client.Models.Requests;
 using VW.PCI.Api.Client.Models.Responses;
 
 namespace VW.PCI.Api.Client
 {
     /// <summary>
-    /// Quản lý vòng đời token PCI: lấy mới, cache in-memory, tự refresh khi hết hạn.
-    /// Token được lưu trong static fields — sống xuyên suốt vòng đời app,
-    /// dùng chung giữa mọi instance và mọi thread.
-    /// Thread-safe qua static lock object.
+    /// Base class quản lý vòng đời PCI token.
+    ///
+    /// Luồng hoạt động:
+    ///   1. GetTokenFromDB()   → lấy token đang lưu
+    ///   2. token.IsValid()?   → còn hạn → dùng luôn
+    ///   3. Hết hạn/chưa có   → gọi /auth/token API
+    ///   4. SaveTokenToDB()    → lưu token mới
+    ///   5. Server trả 401     → InvalidateToken() → xóa DB → lần sau fetch lại
+    ///
+    /// Cách dùng: kế thừa class này và implement GetTokenFromDB() + SaveTokenToDB() + InvalidateTokenInDB()
+    /// với bất kỳ DB framework nào (EF, Dapper, ADO.NET...).
     /// </summary>
-    public class PCITokenProvider
+    public abstract class PCITokenProvider
     {
-        private readonly AuthTokenRequest _credentials;
-        private readonly ILogger _logger;
+        protected readonly AuthTokenRequest Credentials;
+        protected readonly ILogger Logger;
 
-        // Static fields: token tồn tại ở class level, không bị mất khi tạo instance mới
-        private static string _accessToken;
-        private static string _tokenType;
-        private static DateTime _expireAt = DateTime.MinValue;
         private static readonly object _lock = new object();
 
-        public PCITokenProvider(AuthTokenRequest credentials, ILogger logger)
+        protected PCITokenProvider(AuthTokenRequest credentials, ILogger logger)
         {
-            _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
-            _logger = logger;
+            Credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
+            Logger = logger;
         }
 
         /// <summary>
         /// Trả về Bearer token hợp lệ.
-        /// - Còn hạn: trả luôn từ cache, không gọi API.
-        /// - Hết hạn hoặc chưa có: gọi /auth/token, lưu vào static cache.
+        /// Tự động gọi API và lưu DB nếu token hết hạn hoặc chưa có.
         /// </summary>
         public string GetAccessToken(Func<AuthTokenRequest, AuthTokenResponse> fetchTokenFunc)
         {
-            if (IsTokenValid())
-                return _accessToken;
+            var tokenInfo = GetTokenFromDB();
+
+            if (tokenInfo != null && tokenInfo.IsValid())
+            {
+                Logger.Debug("PCITokenProvider: Using existing token from storage.");
+                return tokenInfo.AccessToken;
+            }
 
             lock (_lock)
             {
-                // Double-check sau khi vào lock: tránh nhiều thread cùng gọi API lấy token
-                if (IsTokenValid())
-                    return _accessToken;
+                // Double-check: tránh nhiều thread cùng gọi API
+                tokenInfo = GetTokenFromDB();
+                if (tokenInfo != null && tokenInfo.IsValid())
+                    return tokenInfo.AccessToken;
 
-                _logger?.Debug("PCITokenProvider: Token expired or not found. Fetching new token...");
+                Logger.Debug("PCITokenProvider: Token expired or not found. Fetching new token...");
 
-                var response = fetchTokenFunc(_credentials);
-
+                var response = fetchTokenFunc(Credentials);
                 if (response == null || string.IsNullOrWhiteSpace(response.AccessToken))
                     throw new InvalidOperationException("PCITokenProvider: Failed to retrieve access token from PCI API.");
 
-                // Lưu vào static cache — tồn tại cho đến khi hết hạn hoặc bị InvalidateToken()
-                _accessToken = response.AccessToken;
-                _tokenType   = response.TokenType;
-                // Trừ 1 phút để tránh dùng token ngay sát thời điểm hết hạn
-                _expireAt = DateTime.UtcNow.AddMinutes(response.ExpireMinutes - 1);
+                var newToken = new PCITokenInfo
+                {
+                    AccessToken = response.AccessToken,
+                    TokenType   = response.TokenType,
+                    // Trừ 1 phút để tránh dùng token ngay sát lúc hết hạn
+                    ExpireAt    = DateTime.UtcNow.AddMinutes(response.ExpireMinutes - 1)
+                };
 
-                _logger?.Debug($"PCITokenProvider: Token cached in-memory. Expires at {_expireAt:O} UTC.");
+                SaveTokenToDB(newToken);
+                Logger.Debug($"PCITokenProvider: New token saved. Expires at {newToken.ExpireAt:O} UTC.");
+
+                return newToken.AccessToken;
             }
-
-            return _accessToken;
         }
 
         /// <summary>
-        /// Xóa token đang cache. Lần gọi GetAccessToken() tiếp theo sẽ fetch token mới.
-        /// Dùng khi server trả về 401 Unauthorized.
+        /// Xóa token đang lưu. Gọi khi server trả 401 Unauthorized.
         /// </summary>
         public void InvalidateToken()
         {
             lock (_lock)
             {
-                _accessToken = null;
-                _expireAt    = DateTime.MinValue;
-                _logger?.Debug("PCITokenProvider: Token invalidated.");
+                InvalidateTokenInDB();
+                Logger.Debug("PCITokenProvider: Token invalidated.");
             }
         }
 
-        private static bool IsTokenValid() =>
-            !string.IsNullOrWhiteSpace(_accessToken) && DateTime.UtcNow < _expireAt;
+        // -------------------------------------------------------------------------
+        // Abstract methods — consumer project tự implement theo DB framework
+        // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// Lấy token hiện tại từ DB/storage.
+        /// Trả về null nếu chưa có token nào.
+        /// </summary>
+        protected abstract PCITokenInfo GetTokenFromDB();
+
+        /// <summary>
+        /// Lưu token mới vào DB/storage (insert hoặc update).
+        /// </summary>
+        protected abstract void SaveTokenToDB(PCITokenInfo token);
+
+        /// <summary>
+        /// Xóa hoặc đánh dấu token hiện tại là hết hạn trong DB/storage.
+        /// </summary>
+        protected abstract void InvalidateTokenInDB();
     }
 }
