@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<apiSettings>
+
+  <!--
+    default: cấu hình dùng chung cho tất cả API trong source "pci".
+    Đổi baseUrl theo môi trường:
+      DEV     : https://pci-api-qa.local/api-microservice
+      UAT/STG : https://sandbox-api.pciapply.com/api-microservice
+      PROD    : (pending)
+  -->
+  <api name="default" source="pci" ssl="true" disabled="false">
+    <baseUrl value="https://pci-api-qa.local/api-microservice" />
+    <authentication mode="none" />
+  </api>
+
+  <!-- 1. Authentication - lấy Bearer token -->
+  <api name="auth/token" source="pci">
+  </api>
+
+  <!-- 2. Tạo user mới -->
+  <api name="user/CreateUser" source="pci">
+  </api>
+
+  <!-- 3. Cập nhật thông tin user -->
+  <api name="user/UpdateUser" source="pci">
+  </api>
+
+  <!-- 4. Lấy thông tin master merchant -->
+  <api name="user/GetMasterMerchant" source="pci">
+  </api>
+
+  <!-- 5. Lấy hierarchy ID -->
+  <api name="user/GetHierarchyID" source="pci">
+  </api>
+
+  <!-- 6. Cập nhật security role theo UserID -->
+  <api name="user/UpdSecRoleByUserID" source="pci">
+  </api>
+
+  <!-- 7. Cập nhật trạng thái opt-in/out -->
+  <api name="user/UpdateOptInOut" source="pci">
+  </api>
+
+  <!-- 8. Lấy toàn bộ hierarchy -->
+  <api name="user/GetAllHierarchyForAO" source="pci">
+  </api>
+
+  <!-- 9. Lấy thông tin user theo username -->
+  <api name="user/GetUsers" source="pci">
+  </api>
+
+</apiSettings>

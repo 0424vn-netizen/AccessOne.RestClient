@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net45;net472</TargetFrameworks>
+    <AssemblyName>VW.PCI.Api.Client</AssemblyName>
+    <RootNamespace>VW.PCI.Api.Client</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="App_Data\ApiSettings\pciSettings.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="App_Data\ApiSettings\pciSettings.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference tới VW.Api.RestClient library -->
+    <ProjectReference Include="..\VW.Api.RestClient\VW.Api.RestClient.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="RestSharp" Version="105.2.3" />
+  </ItemGroup>
+
+</Project>
