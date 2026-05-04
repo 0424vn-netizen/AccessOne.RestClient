@@ -19,7 +19,5 @@ namespace VW.PCI.Api.Client
         protected override PCITokenInfo GetTokenFromDB() => _cachedToken;
 
         protected override void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
-
-        protected override void InvalidateTokenInDB() => _cachedToken = null;
     }
 }

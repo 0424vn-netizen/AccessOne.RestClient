@@ -1,7 +1,6 @@
 using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.Net;
 using VW.Api.RestClient;
 using VW.Api.RestClient.Models;
 using VW.PCI.Api.Client.Models.Common;
@@ -40,20 +39,6 @@ namespace VW.PCI.Api.Client
 
             var token = _tokenProvider.GetAccessToken(FetchToken);
             request.AddHeader("Authorization", $"Bearer {token}");
-        }
-
-        /// <summary>
-        /// Nếu server trả 401 → token hết hạn → invalidate để lần sau lấy lại.
-        /// </summary>
-        protected override void InterceptResponse(string trackingId, ApiSetting apiSetting, IRestRequest request, IRestResponse response, out bool shouldRetryPrevRequest)
-        {
-            shouldRetryPrevRequest = false;
-
-            if (response?.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                Logger.Debug("PCIServiceClient: Received 401 Unauthorized. Invalidating token.");
-                _tokenProvider.InvalidateToken();
-            }
         }
 
         /// <summary>

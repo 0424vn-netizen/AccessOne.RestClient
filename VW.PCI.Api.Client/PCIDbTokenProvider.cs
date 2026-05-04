@@ -9,7 +9,7 @@ namespace VW.PCI.Api.Client
     /// Phù hợp khi chạy multi-instance (nhiều server dùng chung token).
     /// Token sống qua app restart.
     ///
-    /// Cách dùng: kế thừa class này, implement 3 method abstract với DB framework của bạn.
+    /// Cách dùng: kế thừa class này, implement 2 method abstract với DB framework của bạn.
     ///
     /// Ví dụ:
     ///   public class MyPCITokenProvider : PCIDbTokenProvider
@@ -25,15 +25,8 @@ namespace VW.PCI.Api.Client
     ///       protected override void SaveTokenToDB(PCITokenInfo token)
     ///       {
     ///           var existing = _db.PCITokens.FirstOrDefault();
-    ///           if (existing != null) { existing.Update(token); }
-    ///           else { _db.PCITokens.Add(token.ToEntity()); }
-    ///           _db.SaveChanges();
-    ///       }
-    ///
-    ///       protected override void InvalidateTokenInDB()
-    ///       {
-    ///           var existing = _db.PCITokens.FirstOrDefault();
-    ///           if (existing != null) { existing.ExpireAt = DateTime.MinValue; _db.SaveChanges(); }
+    ///           if (existing != null) { existing.Update(token); _db.SaveChanges(); }
+    ///           else { _db.PCITokens.Add(token.ToEntity()); _db.SaveChanges(); }
     ///       }
     ///   }
     /// </summary>
@@ -44,6 +37,5 @@ namespace VW.PCI.Api.Client
 
         protected override abstract PCITokenInfo GetTokenFromDB();
         protected override abstract void SaveTokenToDB(PCITokenInfo token);
-        protected override abstract void InvalidateTokenInDB();
     }
 }

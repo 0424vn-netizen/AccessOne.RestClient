@@ -10,13 +10,15 @@ namespace VW.PCI.Api.Client
     /// Base class quản lý vòng đời PCI token.
     ///
     /// Luồng hoạt động:
-    ///   1. GetTokenFromDB()   → lấy token đang lưu
-    ///   2. token.IsValid()?   → còn hạn → dùng luôn
-    ///   3. Hết hạn/chưa có   → gọi /auth/token API
-    ///   4. SaveTokenToDB()    → lưu token mới
-    ///   5. Server trả 401     → InvalidateToken() → xóa DB → lần sau fetch lại
+    ///   1. GetTokenFromDB()  → lấy token đang lưu
+    ///   2. token.IsValid()?  → còn hạn (dựa vào expireMinutes) → dùng luôn
+    ///   3. Hết hạn/chưa có  → gọi /auth/token API lấy token mới
+    ///   4. SaveTokenToDB()   → lưu token mới vào storage
     ///
-    /// Cách dùng: kế thừa class này và implement GetTokenFromDB() + SaveTokenToDB() + InvalidateTokenInDB()
+    /// Token refresh hoàn toàn dựa vào expireMinutes trả về từ /auth/token.
+    /// Không detect từ response vì PCI document chỉ định nghĩa 200 và 500.
+    ///
+    /// Cách dùng: kế thừa class này và implement GetTokenFromDB() + SaveTokenToDB()
     /// với bất kỳ DB framework nào (EF, Dapper, ADO.NET...).
     /// </summary>
     public abstract class PCITokenProvider
@@ -34,7 +36,7 @@ namespace VW.PCI.Api.Client
 
         /// <summary>
         /// Trả về Bearer token hợp lệ.
-        /// Tự động gọi API và lưu DB nếu token hết hạn hoặc chưa có.
+        /// Tự động gọi API và lưu storage nếu token hết hạn hoặc chưa có.
         /// </summary>
         public string GetAccessToken(Func<AuthTokenRequest, AuthTokenResponse> fetchTokenFunc)
         {
@@ -48,7 +50,7 @@ namespace VW.PCI.Api.Client
 
             lock (_lock)
             {
-                // Double-check: tránh nhiều thread cùng gọi API
+                // Double-check: tránh nhiều thread cùng gọi API khi token vừa hết hạn
                 tokenInfo = GetTokenFromDB();
                 if (tokenInfo != null && tokenInfo.IsValid())
                     return tokenInfo.AccessToken;
@@ -63,7 +65,7 @@ namespace VW.PCI.Api.Client
                 {
                     AccessToken = response.AccessToken,
                     TokenType   = response.TokenType,
-                    // Trừ 1 phút để tránh dùng token ngay sát lúc hết hạn
+                    // Trừ 1 phút buffer để tránh dùng token ngay sát lúc hết hạn
                     ExpireAt    = DateTime.UtcNow.AddMinutes(response.ExpireMinutes - 1)
                 };
 
@@ -71,18 +73,6 @@ namespace VW.PCI.Api.Client
                 Logger.Debug($"PCITokenProvider: New token saved. Expires at {newToken.ExpireAt:O} UTC.");
 
                 return newToken.AccessToken;
-            }
-        }
-
-        /// <summary>
-        /// Xóa token đang lưu. Gọi khi server trả 401 Unauthorized.
-        /// </summary>
-        public void InvalidateToken()
-        {
-            lock (_lock)
-            {
-                InvalidateTokenInDB();
-                Logger.Debug("PCITokenProvider: Token invalidated.");
             }
         }
 
@@ -100,10 +90,5 @@ namespace VW.PCI.Api.Client
         /// Lưu token mới vào DB/storage (insert hoặc update).
         /// </summary>
         protected abstract void SaveTokenToDB(PCITokenInfo token);
-
-        /// <summary>
-        /// Xóa hoặc đánh dấu token hiện tại là hết hạn trong DB/storage.
-        /// </summary>
-        protected abstract void InvalidateTokenInDB();
     }
 }

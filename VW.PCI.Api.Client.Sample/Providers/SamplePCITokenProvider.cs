@@ -42,12 +42,5 @@ namespace VW.PCI.Api.Client.Sample.Providers
             Logger.Debug($"SamplePCITokenProvider: SaveTokenToDB() — ExpireAt={token.ExpireAt:O}");
             _dbRow = token;
         }
-
-        protected override void InvalidateTokenInDB()
-        {
-            // Thực tế: UPDATE tbl_PCI_Token SET ExpireAt = GETUTCDATE() (hoặc DELETE)
-            Logger.Debug("SamplePCITokenProvider: InvalidateTokenInDB()");
-            _dbRow = null;
-        }
     }
 }
