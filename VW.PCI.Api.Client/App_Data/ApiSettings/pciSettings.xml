@@ -8,7 +8,7 @@
       UAT/STG : https://sandbox-api.pciapply.com/api-microservice
       PROD    : (pending)
   -->
-  <api name="default" source="pci" ssl="true" disabled="false">
+  <api name="default" source="pci" ssl="true" bypassCertVerification="true" disabled="false">
     <baseUrl value="https://pci-api-qa.local/api-microservice" />
     <authentication mode="none" />
   </api>
