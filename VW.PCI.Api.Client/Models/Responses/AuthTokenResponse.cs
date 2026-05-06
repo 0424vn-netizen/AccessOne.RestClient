@@ -7,8 +7,4 @@ namespace VW.PCI.Api.Client.Models.Responses
         public int ExpireMinutes { get; set; }
     }
 
-    internal class AuthTokenApiResponse
-    {
-        public AuthTokenResponse Data { get; set; }
-    }
 }

@@ -109,7 +109,7 @@ namespace VW.PCI.Api.Client
                 Logger.Debug($"PCIServiceClient: Fetching new token for ApplicationId={key}...");
 
                 var apiSetting   = this.GetApiSetting("auth/token");
-                var apiResponse  = this.Post<AuthTokenRequest, AuthTokenApiResponse>(apiSetting, body: _credentials);
+                var apiResponse  = this.Post<AuthTokenRequest, PCIEnvelope<AuthTokenResponse>>(apiSetting, body: _credentials);
                 var response     = apiResponse?.Data;
 
                 if (response == null || string.IsNullOrWhiteSpace(response.AccessToken))
@@ -169,7 +169,7 @@ namespace VW.PCI.Api.Client
             {
                 var apiSetting = this.GetApiSetting(path);
                 var tid        = trackingId ?? Guid.NewGuid().ToString("N");
-                var response   = this.PostForRestResponse<TBody, TResult>(apiSetting, body, trackingId: tid);
+                var response   = this.PostForRestResponse<TBody, PCIEnvelope<TResult>>(apiSetting, body, trackingId: tid);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                     return new PCIApiResponse<TResult>
@@ -177,7 +177,7 @@ namespace VW.PCI.Api.Client
                         IsSuccess  = true,
                         StatusCode = response.StatusCode,
                         TrackingId = tid,
-                        Data       = response.Data
+                        Data       = response.Data?.Data
                     };
 
                 var error = TryDeserializeError(response.Content);
