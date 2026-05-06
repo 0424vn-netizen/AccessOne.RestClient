@@ -1,4 +1,5 @@
 using System;
+using VW.PCI.Api.Client;
 using VW.PCI.Api.Client.Models.Common;
 using VW.PCI.Api.Client.Models.Requests;
 
@@ -6,12 +7,17 @@ namespace VW.PCI.Api.Client.Sample.Examples
 {
     public class UserExamples
     {
-        private static IPCIServiceClient Client => PCIServiceClient.Instance;
+        private readonly IPCIServiceClient _client;
+
+        public UserExamples(AuthTokenRequest credentials)
+        {
+            _client = PCIServiceClient.ForUser(credentials);
+        }
 
         public void CreateUser()
         {
             Console.WriteLine("\n=== CreateUser ===");
-            var result = Client.CreateUser(new CreateUserRequest
+            var result = _client.CreateUser(new CreateUserRequest
             {
                 UserName            = "john.doe",
                 AsClient            = "64",
@@ -37,7 +43,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void UpdateUser()
         {
             Console.WriteLine("\n=== UpdateUser ===");
-            var result = Client.UpdateUser(new UpdateUserRequest
+            var result = _client.UpdateUser(new UpdateUserRequest
             {
                 RecId               = "550e8400-e29b-41d4-a716-446655440000",
                 UserName            = "john.doe",
@@ -59,7 +65,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void GetMasterMerchant()
         {
             Console.WriteLine("\n=== GetMasterMerchant ===");
-            var result = Client.GetMasterMerchant(new GetMasterMerchantRequest
+            var result = _client.GetMasterMerchant(new GetMasterMerchantRequest
             {
                 ASClient      = "64",
                 PrimaryUserId = "john.doe"
@@ -75,7 +81,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void GetHierarchyID()
         {
             Console.WriteLine("\n=== GetHierarchyID ===");
-            var result = Client.GetHierarchyID(new GetHierarchyIDRequest
+            var result = _client.GetHierarchyID(new GetHierarchyIDRequest
             {
                 ASClient        = "64",
                 HierarchyCode   = "H001",
@@ -92,7 +98,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void UpdSecRoleByUserID()
         {
             Console.WriteLine("\n=== UpdSecRoleByUserID ===");
-            var result = Client.UpdSecRoleByUserID(new UpdSecRoleByUserIDRequest
+            var result = _client.UpdSecRoleByUserID(new UpdSecRoleByUserIDRequest
             {
                 ASClient          = "64",
                 UserID            = "john.doe",
@@ -105,7 +111,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void UpdateOptInOut()
         {
             Console.WriteLine("\n=== UpdateOptInOut ===");
-            var result = Client.UpdateOptInOut(new UpdateOptInOutRequest
+            var result = _client.UpdateOptInOut(new UpdateOptInOutRequest
             {
                 ASClient = "64",
                 UserID   = "john.doe",
@@ -117,7 +123,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void GetAllHierarchyForAO()
         {
             Console.WriteLine("\n=== GetAllHierarchyForAO ===");
-            var result = Client.GetAllHierarchyForAO(new GetAllHierarchyForAORequest
+            var result = _client.GetAllHierarchyForAO(new GetAllHierarchyForAORequest
             {
                 ASClient    = "64",
                 UserSecRole = "MERCHANT"
@@ -134,7 +140,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
         public void GetUsers()
         {
             Console.WriteLine("\n=== GetUsers ===");
-            var result = Client.GetUsers(new GetUsersRequest
+            var result = _client.GetUsers(new GetUsersRequest
             {
                 ASClient = "64",
                 UserName = "john.doe"

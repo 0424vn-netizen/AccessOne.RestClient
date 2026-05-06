@@ -1,5 +1,6 @@
 using RestSharp;
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using VW.Api.RestClient;
 using VW.Api.RestClient.Models;
@@ -10,54 +11,71 @@ using VW.PCI.Api.Client.Models.Responses;
 namespace VW.PCI.Api.Client
 {
     /// <summary>
-    /// PCI API client.
+    /// PCI API client — per-user token, shared infrastructure.
     ///
     /// Setup 1 lần tại app startup:
-    ///   PCIServiceClient.Configure(logger, loggingService, new AuthTokenRequest { ... });
+    ///   PCIServiceClient.Configure(logger, loggingService);
     ///
-    /// Dùng ở bất kỳ đâu:
-    ///   PCIServiceClient.Instance.GetUsers(request);
+    /// Mỗi request, dùng credentials của user đang login:
+    ///   PCIServiceClient.ForUser(new AuthTokenRequest { ApplicationId = ..., ... }).GetUsers(request);
     ///
-    /// Nếu cần lưu token vào DB (multi-server): kế thừa class này và override
-    /// GetTokenFromDB() / SaveTokenToDB() với DB framework của bạn.
+    /// Token được cache riêng theo ApplicationId, tự refresh khi hết hạn.
     /// </summary>
     public class PCIServiceClient : VWRestClient, IPCIServiceClient
     {
         private const string ApiSource      = "pci";
         private const string ApiSettingFile = "pciSettings.xml";
 
-        private readonly AuthTokenRequest _credentials;
+        // ---------------------------------------------------------------------
+        // Shared infrastructure — set once at startup via Configure()
+        // ---------------------------------------------------------------------
+
+        private static ILogger          _sharedLogger;
+        private static ILoggingService  _sharedLoggingService;
+
+        public static void Configure(ILogger logger, ILoggingService loggingService)
+        {
+            _sharedLogger         = logger         ?? throw new ArgumentNullException(nameof(logger));
+            _sharedLoggingService = loggingService  ?? throw new ArgumentNullException(nameof(loggingService));
+        }
+
+        // ---------------------------------------------------------------------
+        // Per-user factory
+        // ---------------------------------------------------------------------
+
+        public static IPCIServiceClient ForUser(AuthTokenRequest credentials)
+        {
+            if (_sharedLogger == null)
+                throw new InvalidOperationException(
+                    "PCIServiceClient has not been configured. Call PCIServiceClient.Configure() at application startup.");
+
+            if (credentials == null) throw new ArgumentNullException(nameof(credentials));
+            if (string.IsNullOrWhiteSpace(credentials.ApplicationId))
+                throw new ArgumentException("ApplicationId is required.", nameof(credentials));
+
+            return new PCIServiceClient(_sharedLogger, _sharedLoggingService, credentials);
+        }
+
+        // ---------------------------------------------------------------------
+        // Per-user token cache keyed by ApplicationId
+        // ---------------------------------------------------------------------
+
+        private static readonly ConcurrentDictionary<string, PCITokenInfo> _tokenCache
+            = new ConcurrentDictionary<string, PCITokenInfo>();
+
         private static readonly object _lock = new object();
 
         // ---------------------------------------------------------------------
-        // Singleton — Configure() once at startup, then use Instance anywhere
+        // Instance state
         // ---------------------------------------------------------------------
 
-        private static PCIServiceClient _instance;
+        private readonly AuthTokenRequest _credentials;
 
-        public static PCIServiceClient Instance
-            => _instance ?? throw new InvalidOperationException(
-                "PCIServiceClient has not been configured. Call PCIServiceClient.Configure() at application startup.");
-
-        public static void Configure(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
-        {
-            _instance = new PCIServiceClient(logger, loggingService, credentials);
-        }
-
-        protected PCIServiceClient(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
+        private PCIServiceClient(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
             : base(logger, loggingService, ApiSource, ApiSettingFile, new RestClientSettings())
         {
-            _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
+            _credentials = credentials;
         }
-
-        // ---------------------------------------------------------------------
-        // Token storage — mặc định in-memory; override nếu cần lưu DB
-        // ---------------------------------------------------------------------
-
-        private static PCITokenInfo _cachedToken;
-
-        protected virtual PCITokenInfo GetTokenFromDB() => _cachedToken;
-        protected virtual void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
 
         // ---------------------------------------------------------------------
         // Token injection
@@ -78,23 +96,23 @@ namespace VW.PCI.Api.Client
 
         private string GetValidToken()
         {
-            var tokenInfo = GetTokenFromDB();
-            if (tokenInfo != null && tokenInfo.IsValid())
+            var key = _credentials.ApplicationId;
+
+            if (_tokenCache.TryGetValue(key, out var tokenInfo) && tokenInfo.IsValid())
                 return tokenInfo.AccessToken;
 
             lock (_lock)
             {
-                tokenInfo = GetTokenFromDB();
-                if (tokenInfo != null && tokenInfo.IsValid())
+                if (_tokenCache.TryGetValue(key, out tokenInfo) && tokenInfo.IsValid())
                     return tokenInfo.AccessToken;
 
-                Logger.Debug("PCIServiceClient: Token expired or not found. Fetching new token...");
+                Logger.Debug($"PCIServiceClient: Fetching new token for ApplicationId={key}...");
 
                 var apiSetting = this.GetApiSetting("auth/token");
                 var response   = this.Post<AuthTokenRequest, AuthTokenResponse>(apiSetting, body: _credentials);
 
                 if (response == null || string.IsNullOrWhiteSpace(response.AccessToken))
-                    throw new InvalidOperationException("PCIServiceClient: Failed to retrieve access token from PCI API.");
+                    throw new InvalidOperationException($"PCIServiceClient: Failed to retrieve access token for ApplicationId={key}.");
 
                 var newToken = new PCITokenInfo
                 {
@@ -103,8 +121,8 @@ namespace VW.PCI.Api.Client
                     ExpireAt    = DateTime.UtcNow.AddMinutes(response.ExpireMinutes - 1)
                 };
 
-                SaveTokenToDB(newToken);
-                Logger.Debug($"PCIServiceClient: New token saved. Expires at {newToken.ExpireAt:O} UTC.");
+                _tokenCache[key] = newToken;
+                Logger.Debug($"PCIServiceClient: Token saved for ApplicationId={key}. Expires at {newToken.ExpireAt:O} UTC.");
 
                 return newToken.AccessToken;
             }

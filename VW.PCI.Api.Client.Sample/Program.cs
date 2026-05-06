@@ -14,23 +14,27 @@ namespace VW.PCI.Api.Client.Sample
             Console.WriteLine("=== VW.PCI.Api.Client — Sample Usage ===\n");
 
             // ------------------------------------------------------------------
-            // Setup 1 lần khi app start
+            // Setup 1 lần khi app start — chỉ infrastructure, không có credentials
             // Trong ASP.NET: đặt ở Application_Start (Global.asax) hoặc Startup.cs
             // ------------------------------------------------------------------
             ApiSettingsManager.Setup(settingFilesDirectory: @"App_Data\ApiSettings");
 
             PCIServiceClient.Configure(
-                logger:         SampleLogger.Instance,
-                loggingService: SampleLoggingService.Instance,
-                credentials:    new AuthTokenRequest
-                {
-                    ApplicationId   = "your-application-id",
-                    ApplicationName = "VisionWeb",
-                    ApplicationCode = "your-application-code"
-                }
+                logger:        SampleLogger.Instance,
+                loggingService: SampleLoggingService.Instance
             );
 
-            var examples = new UserExamples();
+            // ------------------------------------------------------------------
+            // Credentials lấy từ user đang login — mỗi request truyền vào ForUser()
+            // ------------------------------------------------------------------
+            var userCredentials = new AuthTokenRequest
+            {
+                ApplicationId   = "user-application-id",
+                ApplicationName = "VisionWeb",
+                ApplicationCode = "user-application-code"
+            };
+
+            var examples = new UserExamples(userCredentials);
 
             try
             {
