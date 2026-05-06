@@ -108,8 +108,9 @@ namespace VW.PCI.Api.Client
 
                 Logger.Debug($"PCIServiceClient: Fetching new token for ApplicationId={key}...");
 
-                var apiSetting = this.GetApiSetting("auth/token");
-                var response   = this.Post<AuthTokenRequest, AuthTokenResponse>(apiSetting, body: _credentials);
+                var apiSetting   = this.GetApiSetting("auth/token");
+                var apiResponse  = this.Post<AuthTokenRequest, AuthTokenApiResponse>(apiSetting, body: _credentials);
+                var response     = apiResponse?.Data;
 
                 if (response == null || string.IsNullOrWhiteSpace(response.AccessToken))
                     throw new InvalidOperationException($"PCIServiceClient: Failed to retrieve access token for ApplicationId={key}.");
