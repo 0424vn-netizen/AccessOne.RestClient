@@ -71,6 +71,11 @@ namespace VW.PCI.Api.Client
             request.AddHeader("Authorization", $"Bearer {GetValidToken()}");
         }
 
+        protected override void InterceptResponse(string trackingId, ApiSetting apiSetting, IRestRequest request, IRestResponse response, out bool shouldRetryPrevRequest)
+        {
+            shouldRetryPrevRequest = false;
+        }
+
         private string GetValidToken()
         {
             var tokenInfo = GetTokenFromDB();
