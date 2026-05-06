@@ -10,34 +10,39 @@ using VW.PCI.Api.Client.Models.Responses;
 namespace VW.PCI.Api.Client
 {
     /// <summary>
-    /// Abstract base client cho PCI APIs.
-    /// Kế thừa class này trong consumer project, implement GetTokenFromDB() và SaveTokenToDB()
-    /// theo storage của project đó, và đặt Singleton Instance tại đó.
+    /// PCI API client.
     ///
-    /// Ví dụ trong consumer project:
-    ///   public class PCIClient : PCIServiceClient
-    ///   {
-    ///       private static readonly Lazy<PCIClient> _lazy = new Lazy<PCIClient>(() => new PCIClient());
-    ///       public static PCIClient Instance => _lazy.Value;
+    /// Setup 1 lần tại app startup:
+    ///   PCIServiceClient.Configure(logger, loggingService, new AuthTokenRequest { ... });
     ///
-    ///       private PCIClient()
-    ///           : base(MyLogger.Instance, MyLoggingService.Instance, new AuthTokenRequest { ... }) { }
+    /// Dùng ở bất kỳ đâu:
+    ///   PCIServiceClient.Instance.GetUsers(request);
     ///
-    ///       private static PCITokenInfo _cachedToken;
-    ///       protected override PCITokenInfo GetTokenFromDB() => _cachedToken;
-    ///       protected override void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
-    ///   }
-    ///
-    ///   // Dùng:
-    ///   PCIClient.Instance.GetUsers(request);
+    /// Nếu cần lưu token vào DB (multi-server): kế thừa class này và override
+    /// GetTokenFromDB() / SaveTokenToDB() với DB framework của bạn.
     /// </summary>
-    public abstract class PCIServiceClient : VWRestClient, IPCIServiceClient
+    public class PCIServiceClient : VWRestClient, IPCIServiceClient
     {
         private const string ApiSource      = "pci";
         private const string ApiSettingFile = "pciSettings.xml";
 
         private readonly AuthTokenRequest _credentials;
         private static readonly object _lock = new object();
+
+        // ---------------------------------------------------------------------
+        // Singleton — Configure() once at startup, then use Instance anywhere
+        // ---------------------------------------------------------------------
+
+        private static PCIServiceClient _instance;
+
+        public static PCIServiceClient Instance
+            => _instance ?? throw new InvalidOperationException(
+                "PCIServiceClient has not been configured. Call PCIServiceClient.Configure() at application startup.");
+
+        public static void Configure(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
+        {
+            _instance = new PCIServiceClient(logger, loggingService, credentials);
+        }
 
         protected PCIServiceClient(ILogger logger, ILoggingService loggingService, AuthTokenRequest credentials)
             : base(logger, loggingService, ApiSource, ApiSettingFile, new RestClientSettings())
@@ -46,11 +51,13 @@ namespace VW.PCI.Api.Client
         }
 
         // ---------------------------------------------------------------------
-        // Token storage — consumer project implement theo DB framework của họ
+        // Token storage — mặc định in-memory; override nếu cần lưu DB
         // ---------------------------------------------------------------------
 
-        protected abstract PCITokenInfo GetTokenFromDB();
-        protected abstract void SaveTokenToDB(PCITokenInfo token);
+        private static PCITokenInfo _cachedToken;
+
+        protected virtual PCITokenInfo GetTokenFromDB() => _cachedToken;
+        protected virtual void SaveTokenToDB(PCITokenInfo token) => _cachedToken = token;
 
         // ---------------------------------------------------------------------
         // Token injection

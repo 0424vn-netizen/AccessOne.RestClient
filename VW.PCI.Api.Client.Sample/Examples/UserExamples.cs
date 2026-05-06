@@ -6,8 +6,7 @@ namespace VW.PCI.Api.Client.Sample.Examples
 {
     public class UserExamples
     {
-        // Dùng thẳng PCIClient.Instance — giống StatementClient.Instance.Method(...)
-        private static IPCIServiceClient Client => PCIClient.Instance;
+        private static IPCIServiceClient Client => PCIServiceClient.Instance;
 
         public void CreateUser()
         {
